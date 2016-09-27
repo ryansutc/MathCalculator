@@ -32,8 +32,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     EditText edittextScreen;
     //An array of the screen to 3 parts:
     //[Left number], [operator], [right number]
-    String[] screenArray;
-    BusinessEngine be = new BusinessEngine();
+    private String[] screenArray;
+    private String screenText;
+    private BusinessEngine be = new BusinessEngine();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,9 +60,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btn7 = (Button) findViewById(R.id.btn7);
         btn8 = (Button) findViewById(R.id.btn8);
         btn9 = (Button) findViewById(R.id.btn9);
-        edittextScreen = (EditText) findViewById(R.id.edittextScreen);
 
-        //edittextScreen.addTextChangedListener(screenTW);
+        edittextScreen = (EditText) findViewById(R.id.edittextScreen);
+        edittextScreen.addTextChangedListener(screenTW);
+        screenText = edittextScreen.getText().toString();
 
         btn0.setOnClickListener(this);
         btn1.setOnClickListener(this);
@@ -73,6 +75,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btn7.setOnClickListener(this);
         btn8.setOnClickListener(this);
         btn9.setOnClickListener(this);
+        btnDecimal.setOnClickListener(this);
 
         btnAdd.setOnClickListener(oclOperators);
         btnSubtract.setOnClickListener(oclOperators);
@@ -80,76 +83,89 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnMultiply.setOnClickListener(oclOperators);
         btnClear.setOnClickListener(oclOperators);
         btnRemove.setOnClickListener(oclOperators);
+        btnEquals.setOnClickListener(oclOperators);
+        btnNegative.setOnClickListener(oclOperators);
+
+        this.triggerButtons();
     }
 
     @Override
-    //handle onClick events for numeric buttons in this activity
+    //handle onClick events for NUMERIC buttons in this activity
     public void onClick(View v)
     {
         // 1) Possibly do explicit check for instance of first
+        screenText = edittextScreen.getText().toString();
         Button b = (Button)v;
         String buttonText = b.getText().toString();
         edittextScreen.setText(edittextScreen.getText() + buttonText);
-        //try to convert to number. if fail it is operator.
     }
 
     //create special listener for operator buttons (*/-+)
     View.OnClickListener oclOperators = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            System.out.println("An operator button was pressed");
             Button b = (Button) v;
             String buttonText = b.getText().toString().toUpperCase();
-            System.out.println(buttonText);
-            String screenText = edittextScreen.getText().toString();
+            System.out.println("An operator button was pressed: " + buttonText);
 
-            //commence long if/then statement
+            //Special Functions handling.
+            //= Equals
             if (buttonText.equals("=")){
                 //convert text to L O R array to calculate
-                System.out.println("= was pressed");
-                screenArray = be.getScreenArray(buttonText);
-                if (screenArray != null) {
-                   screenText = String.valueOf(be.calculate(screenArray));
-                    activateOperators(true);
-                }
+                screenArray = be.getScreenArray(screenText);
+                screenText = String.valueOf(be.calculate(screenArray));
+                edittextScreen.setText(screenText);
+                return;
             }
+            //CLEAR
             else if (buttonText.equals("CLEAR")){
                 screenText = "";
-                System.out.println("CLEAR button pressed");
-                activateOperators(false);
+                edittextScreen.setText(screenText);
+                return;
             }
             //backspace
             else if (buttonText.equals("<-")){
-                screenText = be.removeChar(screenText);
-                String pattern = "[+'-'*/]";
-                if (screenText.matches(pattern)){
-                    activateOperators(false);
+                if (screenText.endsWith(" ")){
+                    screenText = be.removeChar(screenText);
+                    screenText = be.removeChar(screenText);
+                    screenText = be.removeChar(screenText);
                 }
-                else { activateOperators(true);}
+                else {
+                    screenText = be.removeChar(screenText);
+                }
+                edittextScreen.setText(screenText);
+                return;
             }
-            //operators
-            else if (buttonText.equals("+")){
+
+            //first check if it should ROLL with a calc
+            if (be.canCalculate(screenText)){
+                screenArray = be.getScreenArray(screenText);
+                screenText = String.valueOf(be.calculate(screenArray));
+            }
+
+            //then run operators
+           if (buttonText.equals("+")){
                 screenText = screenText + " + ";
-                activateOperators(false);
             }
             else if (buttonText.equals("-")){
                 screenText = screenText + " - ";
-                activateOperators(false);
             }
             else if (buttonText.equals("/")){
                 screenText = screenText + " / ";
-                activateOperators(false);
             }
             else if (buttonText.equals("*")){
                 screenText = screenText + " * ";
-                activateOperators(false);
+            }
+            else if (buttonText.equals("+/-")){
+                screenText = be.calcNegative(screenText);
             }
             else {
-                screenText = screenText;
+                System.out.println("Could not find button");
             }
             edittextScreen.setText(screenText);
         }
     };
+
     //Control enabling/ disabling operator buttons
     private void activateOperators(boolean blnActivate){
         if (blnActivate){
@@ -158,6 +174,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             btnSubtract.setEnabled(true);
             btnDecimal.setEnabled(true);
             btnAdd.setEnabled(true);
+            btnNegative.setEnabled(true);
         }
         else {
             btnMultiply.setEnabled(false);
@@ -165,9 +182,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             btnSubtract.setEnabled(false);
             btnDecimal.setEnabled(false);
             btnAdd.setEnabled(false);
+            btnNegative.setEnabled(false);
         }
     }
-/*
+
+    //Toggle Buttons on and off based on textChange
+    //this is the main point of validation
+    private void triggerButtons(){
+
+        // Enable/Disable =
+        if (be.canCalculate(screenText)){
+            btnEquals.setEnabled(true);
+        }
+        else {
+            btnEquals.setEnabled(false);
+        }
+
+        //Enable/Disable Operators (+-/*)
+        if (be.endswithOperator(screenText)){
+            System.out.println("Operator Detected, deactivate");
+            activateOperators(false);
+        }
+        else {
+            activateOperators(true);
+        }
+        //enable disable <- / CLEAR
+        if (screenText.equals("")){
+            btnRemove.setEnabled(false);
+            btnClear.setEnabled(false);
+            activateOperators(false);
+        }
+        else  {
+            btnRemove.setEnabled(true);
+            btnClear.setEnabled(true);
+        }
+
+        //enable disable decimal .
+        if (be.hasDecimal(screenText) && be.endswithNum(screenText) == false){
+            btnDecimal.setEnabled(false);
+        }
+        else {
+            btnDecimal.setEnabled(true);
+        }
+
+    }
+
     private TextWatcher screenTW = new TextWatcher() {
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -175,19 +234,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
-            try {
-                //float bill = Float.parseFloat(s.toString());
-                //updateForm(bill);
-                System.out.println(s);
-            } catch (NumberFormatException e) {
-
-            }
         }
 
         @Override
         public void afterTextChanged(Editable s) {
             System.out.println("After Change Occurred");
+            screenText = s.toString();
+            if (screenText.equals(".")){
+                screenText = "0.";
+            }
+            triggerButtons();
         }
     };
-*/
-}
+}//end class
